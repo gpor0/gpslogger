@@ -22,8 +22,7 @@ package com.mendhak.gpslogger.ui.fragments.display;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
-import android.support.v4.content.ContextCompat;
-import android.text.Html;
+import androidx.core.content.ContextCompat;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,16 +36,13 @@ import com.mendhak.gpslogger.common.Session;
 import com.mendhak.gpslogger.common.Strings;
 import com.mendhak.gpslogger.common.events.ServiceEvents;
 import com.mendhak.gpslogger.common.slf4j.Logs;
-import com.mendhak.gpslogger.loggers.FileLogger;
-import com.mendhak.gpslogger.loggers.FileLoggerFactory;
-import com.mendhak.gpslogger.loggers.Files;
+import com.mendhak.gpslogger.loggers.LoggerFactory;
 import com.mendhak.gpslogger.senders.FileSenderFactory;
-import org.slf4j.Logger;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
+import java.util.Set;
 
 
 public class GpsDetailedViewFragment extends GenericViewFragment {
@@ -54,7 +50,7 @@ public class GpsDetailedViewFragment extends GenericViewFragment {
 
     private View rootView;
     private ActionProcessButton actionButton;
-    private static final Logger LOG = Logs.of(GpsDetailedViewFragment.class);
+    private static final org.slf4j.Logger LOG = Logs.of(GpsDetailedViewFragment.class);
     private PreferenceHelper preferenceHelper = PreferenceHelper.getInstance();
     private Session session = Session.getInstance();
 
@@ -142,15 +138,15 @@ public class GpsDetailedViewFragment extends GenericViewFragment {
             TextView txtDistance = (TextView) rootView.findViewById(R.id.detailedview_distance_text);
             TextView txtAutoEmail = (TextView) rootView.findViewById(R.id.detailedview_autosend_text);
 
-            List<FileLogger> loggers = FileLoggerFactory.getFileLoggers(getActivity().getApplicationContext());
+            Set<String> loggers = LoggerFactory.getLoggers();
 
             if (loggers.size() > 0) {
 
                 StringBuilder enabledLoggers = new StringBuilder();
 
-                for(FileLogger l : loggers){
-                    if(!Strings.isNullOrEmpty(l.getName())){
-                        enabledLoggers.append(l.getName() + " ");
+                for(String l : loggers){
+                    if(!Strings.isNullOrEmpty(l)){
+                        enabledLoggers.append(l + " ");
                     }
                 }
 
@@ -346,8 +342,8 @@ public class GpsDetailedViewFragment extends GenericViewFragment {
                 + " " + new SimpleDateFormat("HH:mm:ss").format(new Date(session.getLatestTimeStamp()))
                 + " - " + providerName);
 
-        tvLatitude.setText(String.valueOf(Strings.getFormattedLatitude(locationInfo.getLatitude())));
-        tvLongitude.setText(String.valueOf(Strings.getFormattedLongitude(locationInfo.getLongitude())));
+        tvLatitude.setText(Strings.getFormattedLatitude(locationInfo.getLatitude()));
+        tvLongitude.setText(Strings.getFormattedLongitude(locationInfo.getLongitude()));
 
         if (locationInfo.hasAltitude()) {
             tvAltitude.setText(Strings.getDistanceDisplay(getActivity(), locationInfo.getAltitude(), preferenceHelper.shouldDisplayImperialUnits(), false));
@@ -369,7 +365,7 @@ public class GpsDetailedViewFragment extends GenericViewFragment {
 
             direction = Strings.getBearingDescription(bearingDegrees, getActivity().getApplicationContext());
 
-            txtDirection.setText(direction + "(" + String.valueOf(Math.round(bearingDegrees))
+            txtDirection.setText(direction + "(" + Math.round(bearingDegrees)
                     + getString(R.string.degree_symbol) + ")");
         } else {
             txtDirection.setText(R.string.not_applicable);

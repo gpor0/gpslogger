@@ -31,13 +31,15 @@ import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
+import android.net.Uri;
 import android.os.BatteryManager;
 import android.os.Build;
 import android.os.PowerManager;
 import android.preference.PreferenceFragment;
 import android.provider.Settings;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.mendhak.gpslogger.R;
 import com.mendhak.gpslogger.common.slf4j.Logs;
@@ -48,10 +50,12 @@ import org.slf4j.Logger;
 import java.util.List;
 import java.util.Locale;
 
+import static android.content.Context.POWER_SERVICE;
+
 public class Systems {
 
     private static final Logger LOG = Logs.of(Systems.class);
-    public final static int REQUEST_PERMISSION_CODE=2191;
+    public final static int REQUEST_PERMISSION_CODE = 2191;
 
     public static int getBatteryLevel(Context context) {
         Intent batteryIntent = context.registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
@@ -71,13 +75,13 @@ public class Systems {
 
     }
 
-    public static boolean isPackageInstalled(String targetPackage, Context context){
+    public static boolean isPackageInstalled(String targetPackage, Context context) {
         List<ApplicationInfo> packages;
         PackageManager pm;
         pm = context.getPackageManager();
         packages = pm.getInstalledApplications(0);
         for (ApplicationInfo packageInfo : packages) {
-            if(packageInfo.packageName.equals(targetPackage)) return true;
+            if (packageInfo.packageName.equals(targetPackage)) return true;
         }
         return false;
     }
@@ -107,7 +111,7 @@ public class Systems {
     @TargetApi(23)
     public static boolean isDozing(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PowerManager powerManager = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            PowerManager powerManager = (PowerManager) context.getSystemService(POWER_SERVICE);
             return powerManager.isDeviceIdleMode() &&
                     !powerManager.isIgnoringBatteryOptimizations(context.getPackageName());
         } else {
@@ -128,13 +132,12 @@ public class Systems {
         if (!Strings.isNullOrEmpty(userSpecifiedLocale)) {
             LOG.debug("Setting language to " + userSpecifiedLocale);
 
-            String language, country="";
+            String language, country = "";
 
-            if(userSpecifiedLocale.contains("-")){
+            if (userSpecifiedLocale.contains("-")) {
                 language = userSpecifiedLocale.split("-")[0];
                 country = userSpecifiedLocale.split("-")[1];
-            }
-            else {
+            } else {
                 language = userSpecifiedLocale;
             }
 
@@ -150,20 +153,21 @@ public class Systems {
      * Whether the user has allowed the permissions absolutely required to run the app.
      * Currently this is location and file storage.
      */
-    public static boolean hasUserGrantedAllNecessaryPermissions(Context context){
+    public static boolean hasUserGrantedAllNecessaryPermissions(Context context) {
         return hasUserGrantedPermission(Manifest.permission.ACCESS_COARSE_LOCATION, context)
                 && hasUserGrantedPermission(Manifest.permission.ACCESS_FINE_LOCATION, context)
                 && hasUserGrantedPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE, context)
                 && hasUserGrantedPermission(Manifest.permission.READ_EXTERNAL_STORAGE, context);
     }
 
-    static boolean hasUserGrantedPermission(String permissionName, Context context){
+    static boolean hasUserGrantedPermission(String permissionName, Context context) {
         boolean granted = ContextCompat.checkSelfPermission(context, permissionName) == PackageManager.PERMISSION_GRANTED;
         LOG.debug("Permission " + permissionName + " : " + granted);
         return granted;
     }
 
     public static void askUserForPermissions(final Activity activity, final PreferenceFragment fragment) {
+
 
         LOG.debug("User has not granted necessary permissions for this app to run.");
 
@@ -178,17 +182,34 @@ public class Systems {
                             if (fragment != null) {
                                 //From preference fragments, requestPermissions is called differently. WHY.
                                 fragment.requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
+                                                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
                                                 Manifest.permission.ACCESS_FINE_LOCATION,
                                                 Manifest.permission.READ_EXTERNAL_STORAGE,
                                                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                                                Manifest.permission.ACTIVITY_RECOGNITION,
+                                                Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                                                 Manifest.permission.GET_ACCOUNTS},
                                         REQUEST_PERMISSION_CODE);
                             } else {
+
+                                String pkg = activity.getPackageName();
+
+                                PowerManager powerManager = (PowerManager) activity.getSystemService(POWER_SERVICE);
+                                if (!powerManager.isIgnoringBatteryOptimizations(pkg)) {
+                                    Intent intent = new Intent();
+                                    intent.setAction(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                                    intent.setData(Uri.parse("package:" + pkg));
+                                    activity.startActivity(intent);
+                                }
+
                                 ActivityCompat.requestPermissions(activity,
                                         new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,
+                                                Manifest.permission.ACCESS_BACKGROUND_LOCATION,
                                                 Manifest.permission.ACCESS_FINE_LOCATION,
                                                 Manifest.permission.READ_EXTERNAL_STORAGE,
                                                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                                                Manifest.permission.ACTIVITY_RECOGNITION,
+                                                Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
                                                 Manifest.permission.GET_ACCOUNTS},
                                         REQUEST_PERMISSION_CODE);
                             }

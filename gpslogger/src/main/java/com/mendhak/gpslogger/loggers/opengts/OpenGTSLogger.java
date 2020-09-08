@@ -19,45 +19,52 @@
 
 package com.mendhak.gpslogger.loggers.opengts;
 
-import android.content.Context;
 import android.location.Location;
+import android.util.Pair;
+
 import com.mendhak.gpslogger.common.PreferenceHelper;
 import com.mendhak.gpslogger.common.SerializableLocation;
-import com.mendhak.gpslogger.loggers.FileLogger;
 import com.mendhak.gpslogger.senders.opengts.OpenGTSManager;
+
+import io.reactivex.Observer;
+import io.reactivex.disposables.Disposable;
 
 /**
  * Send locations directly to an OpenGTS server <br/>
  *
  * @author Francisco Reynoso
  */
-public class OpenGTSLogger implements FileLogger {
+public class OpenGTSLogger implements Observer<Pair<Location, Integer>> {
 
     protected final String name = "OpenGTS";
-    final Context context;
-    int batteryLevel;
     private static PreferenceHelper preferenceHelper = PreferenceHelper.getInstance();
 
-    public OpenGTSLogger(Context context, int batteryLevel) {
-        this.context = context;
-        this.batteryLevel=batteryLevel;
+    public OpenGTSLogger() {
     }
 
-    @Override
-    public void write(Location loc) throws Exception {
-
+    public void write(Integer batteryLevel, Location loc) {
         OpenGTSManager manager = new OpenGTSManager(preferenceHelper, batteryLevel);
         manager.sendLocations(new SerializableLocation[]{new SerializableLocation(loc)});
     }
 
     @Override
-    public void annotate(String description, Location loc) throws Exception {
+    public void onSubscribe(Disposable d) {
+
     }
 
     @Override
-    public String getName() {
-        return name;
+    public void onNext(Pair<Location, Integer> locationIntegerPair) {
+        write(locationIntegerPair.second, locationIntegerPair.first);
     }
 
+    @Override
+    public void onError(Throwable e) {
+
+    }
+
+    @Override
+    public void onComplete() {
+
+    }
 }
 

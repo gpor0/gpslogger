@@ -19,18 +19,23 @@
 
 package com.mendhak.gpslogger;
 
-import android.location.*;
+import android.location.GnssStatus;
+import android.location.Location;
+import android.location.LocationListener;
+import android.location.LocationProvider;
+import android.location.OnNmeaMessageListener;
 import android.os.Bundle;
+import androidx.annotation.NonNull;
+
 import com.mendhak.gpslogger.common.BundleConstants;
 import com.mendhak.gpslogger.common.Session;
 import com.mendhak.gpslogger.common.Strings;
 import com.mendhak.gpslogger.common.slf4j.Logs;
 import com.mendhak.gpslogger.loggers.nmea.NmeaSentence;
+
 import org.slf4j.Logger;
 
-import java.util.Iterator;
-
-class GeneralLocationListener implements LocationListener, GpsStatus.Listener, GpsStatus.NmeaListener {
+class GeneralLocationListener extends GnssStatus.Callback implements LocationListener, OnNmeaMessageListener {
 
     private String listenerName;
     private static GpsLoggingService loggingService;
@@ -52,6 +57,7 @@ class GeneralLocationListener implements LocationListener, GpsStatus.Listener, G
     /**
      * Event raised when a new fix is received.
      */
+    @Override
     public void onLocationChanged(Location loc) {
 
         try {
@@ -110,78 +116,68 @@ class GeneralLocationListener implements LocationListener, GpsStatus.Listener, G
         }
     }
 
-    public void onGpsStatusChanged(int event) {
-
-        switch (event) {
-            case GpsStatus.GPS_EVENT_FIRST_FIX:
-                LOG.debug(loggingService.getString(R.string.fix_obtained));
-                break;
-
-            case GpsStatus.GPS_EVENT_SATELLITE_STATUS:
-
-                GpsStatus status = loggingService.gpsLocationManager.getGpsStatus(null);
-
-                int maxSatellites = status.getMaxSatellites();
-
-                Iterator<GpsSatellite> it = status.getSatellites().iterator();
-                int satellitesVisible = 0;
-                satellitesUsedInFix=0;
-
-                while (it.hasNext() && satellitesVisible <= maxSatellites) {
-                    GpsSatellite sat = it.next();
-                    if(sat.usedInFix()){
-                        satellitesUsedInFix++;
-                    }
-                    satellitesVisible++;
-                }
-
-                LOG.debug(String.valueOf(satellitesVisible) + " satellites");
-                loggingService.setSatelliteInfo(satellitesVisible);
-                break;
-
-            case GpsStatus.GPS_EVENT_STARTED:
-                LOG.info(loggingService.getString(R.string.started_waiting));
-                break;
-
-            case GpsStatus.GPS_EVENT_STOPPED:
-                LOG.info(loggingService.getString(R.string.gps_stopped));
-                break;
-
-        }
+    @Override
+    public void onStarted() {
+        super.onStarted();
+        LOG.info(loggingService.getString(R.string.started_waiting));
     }
 
     @Override
-    public void onNmeaReceived(long timestamp, String nmeaSentence) {
+    public void onStopped() {
+        super.onStopped();
+        LOG.info(loggingService.getString(R.string.gps_stopped));
+    }
+
+    @Override
+    public void onFirstFix(int ttffMillis) {
+        super.onFirstFix(ttffMillis);
+        LOG.debug(loggingService.getString(R.string.fix_obtained));
+    }
+
+    @Override
+    public void onSatelliteStatusChanged(@NonNull GnssStatus status) {
+        super.onSatelliteStatusChanged(status);
+
+        int satellitesVisible = status.getSatelliteCount();
+        satellitesUsedInFix = satellitesVisible;
+
+        LOG.debug(satellitesVisible + " satellites");
+        loggingService.setSatelliteInfo(satellitesVisible);
+    }
+
+    @Override
+    public void onNmeaMessage(String nmeaSentence, long timestamp) {
+
         loggingService.onNmeaSentence(timestamp, nmeaSentence);
 
-        if(Strings.isNullOrEmpty(nmeaSentence)){
+        if (Strings.isNullOrEmpty(nmeaSentence)) {
             return;
         }
 
         NmeaSentence nmea = new NmeaSentence(nmeaSentence);
 
-        if(nmea.isLocationSentence()){
-            if(nmea.getLatestPdop() != null){
+        if (nmea.isLocationSentence()) {
+            if (nmea.getLatestPdop() != null) {
                 this.latestPdop = nmea.getLatestPdop();
             }
 
-            if(nmea.getLatestHdop() != null){
+            if (nmea.getLatestHdop() != null) {
                 this.latestHdop = nmea.getLatestHdop();
             }
 
-            if(nmea.getLatestVdop() != null){
+            if (nmea.getLatestVdop() != null) {
                 this.latestVdop = nmea.getLatestVdop();
             }
 
-            if(nmea.getGeoIdHeight() != null){
+            if (nmea.getGeoIdHeight() != null) {
                 this.geoIdHeight = nmea.getGeoIdHeight();
             }
 
-            if(nmea.getAgeOfDgpsData() != null){
+            if (nmea.getAgeOfDgpsData() != null) {
                 this.ageOfDgpsData = nmea.getAgeOfDgpsData();
             }
 
-            if(nmea.getDgpsId() != null){
+            if (nmea.getDgpsId() != null) {
                 this.dgpsId = nmea.getDgpsId();
             }
 

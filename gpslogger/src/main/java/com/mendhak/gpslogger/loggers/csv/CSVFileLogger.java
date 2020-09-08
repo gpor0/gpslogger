@@ -20,45 +20,62 @@
 package com.mendhak.gpslogger.loggers.csv;
 
 import android.location.Location;
-import android.support.annotation.Nullable;
+import android.util.Pair;
 
 import com.mendhak.gpslogger.common.BundleConstants;
 import com.mendhak.gpslogger.common.Maths;
 import com.mendhak.gpslogger.common.Session;
 import com.mendhak.gpslogger.common.Strings;
-import com.mendhak.gpslogger.loggers.FileLogger;
 import com.mendhak.gpslogger.loggers.Files;
 
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Date;
 import java.util.Locale;
 
+import io.reactivex.Observer;
+import io.reactivex.disposables.Disposable;
 
-public class CSVFileLogger implements FileLogger {
 
-    private final Integer batteryLevel;
+public class CSVFileLogger implements Observer<Pair<Location, Integer>> {
+
     private File file;
     protected final String name = "TXT";
 
-    public CSVFileLogger(File file, @Nullable Integer batteryLevel) {
+    public CSVFileLogger(File file) {
         this.file = file;
-        this.batteryLevel = batteryLevel;
+    }
+
+
+    @Override
+    public void onSubscribe(Disposable d) {
+
     }
 
     @Override
-    public void write(Location loc) throws Exception {
+    public void onNext(Pair<Location, Integer> locationIntegerPair) {
         if (!Session.getInstance().hasDescription()) {
-            annotate("", loc);
+            annotate("", locationIntegerPair.second, locationIntegerPair.first);
         }
     }
 
-    String getCsvLine(Location loc, String dateTimeString) {
-        return getCsvLine("", loc, dateTimeString);
+    @Override
+    public void onError(Throwable e) {
+
     }
 
-    String getCsvLine(String description, Location loc, String dateTimeString) {
+    @Override
+    public void onComplete() {
+
+    }
+
+    String getCsvLine(Location loc, Integer batteryLevel, String dateTimeString) {
+        return getCsvLine("", batteryLevel, loc, dateTimeString);
+    }
+
+    String getCsvLine(String description, Integer batteryLevel, Location loc, String dateTimeString) {
 
         if (description.length() > 0) {
             description = "\"" + description.replaceAll("\"", "\"\"") + "\"";
@@ -86,36 +103,35 @@ public class CSVFileLogger implements FileLogger {
         return outputString;
     }
 
-    @Override
-    public void annotate(String description, Location loc) throws Exception {
-        if (!Files.reallyExists(file)) {
-            file.createNewFile();
+    public void annotate(String description, Integer batteryLevel, Location loc) {
+
+        try {
+            if (!Files.reallyExists(file)) {
+                file.createNewFile();
+
+                FileOutputStream writer = new FileOutputStream(file, true);
+                BufferedOutputStream output = new BufferedOutputStream(writer);
+                String header = "time,lat,lon,elevation,accuracy,bearing,speed,satellites,provider,hdop,vdop,pdop,geoidheight,ageofdgpsdata,dgpsid,activity,battery,annotation\n";
+                output.write(header.getBytes());
+                output.flush();
+                output.close();
+
+            }
 
             FileOutputStream writer = new FileOutputStream(file, true);
             BufferedOutputStream output = new BufferedOutputStream(writer);
-            String header = "time,lat,lon,elevation,accuracy,bearing,speed,satellites,provider,hdop,vdop,pdop,geoidheight,ageofdgpsdata,dgpsid,activity,battery,annotation\n";
-            output.write(header.getBytes());
+
+            String dateTimeString = Strings.getIsoDateTime(new Date(loc.getTime()));
+            String csvLine = getCsvLine(description, batteryLevel, loc, dateTimeString);
+
+
+            output.write(csvLine.getBytes());
             output.flush();
             output.close();
-
+            Files.addToMediaDatabase(file, "text/csv");
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage(), e);
         }
-
-        FileOutputStream writer = new FileOutputStream(file, true);
-        BufferedOutputStream output = new BufferedOutputStream(writer);
-
-        String dateTimeString = Strings.getIsoDateTime(new Date(loc.getTime()));
-        String csvLine = getCsvLine(description, loc, dateTimeString);
-
-
-        output.write(csvLine.getBytes());
-        output.flush();
-        output.close();
-        Files.addToMediaDatabase(file, "text/csv");
-    }
-
-    @Override
-    public String getName() {
-        return name;
     }
 
 }

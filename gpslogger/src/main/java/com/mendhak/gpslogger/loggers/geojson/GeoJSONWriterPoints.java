@@ -1,7 +1,7 @@
 package com.mendhak.gpslogger.loggers.geojson;
 
 import android.location.Location;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 
 import com.mendhak.gpslogger.common.Strings;
 import com.mendhak.gpslogger.common.slf4j.Logs;
@@ -87,7 +87,7 @@ public class GeoJSONWriterPoints implements Runnable {
             value.append(HEADER);
         }
         String dateTimeString = Strings.getIsoDateTime(new Date(location.getTime()));
-        String extra = "";
+
         StringBuilder attributes = new StringBuilder();
         attributes.append("\"time\":\"").append(dateTimeString).append("\"");
         attributes.append(String.format(ATTRIBUTE_TEMPLATE, "provider", location.getProvider()));
@@ -108,7 +108,7 @@ public class GeoJSONWriterPoints implements Runnable {
             attributes.append(String.format(NUMERIC_ATTRIBUTE_TEMPLATE, "speed", location.getSpeed()));
         }
 
-        extra = attributes.toString();
+        String extra = attributes.toString();
         value.append(String.format(TEMPLATE,
                 extra,
                 coords)).append(TRAILER);

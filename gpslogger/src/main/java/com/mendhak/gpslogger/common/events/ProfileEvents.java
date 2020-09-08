@@ -27,7 +27,7 @@ public class ProfileEvents {
     public static class SwitchToProfile {
         public String newProfileName;
 
-        public SwitchToProfile(String newProfileName){
+        public SwitchToProfile(String newProfileName) {
             this.newProfileName = newProfileName;
         }
     }
@@ -37,6 +37,7 @@ public class ProfileEvents {
      */
     public static class CreateNewProfile {
         public String newProfileName;
+
         public CreateNewProfile(String newProfileName) {
             this.newProfileName = newProfileName;
         }
@@ -47,14 +48,20 @@ public class ProfileEvents {
      */
     public static class DownloadProfile {
         public String profileUrl;
-        public DownloadProfile(String profileUrl) { this.profileUrl = profileUrl; }
+        public boolean force;
+
+        public DownloadProfile(String profileUrl, boolean force) {
+            this.profileUrl = profileUrl;
+            this.force = force;
+        }
     }
 
     /**
      * Requests the profiles list navigation drawer be repopulated
      */
-    public static class PopulateProfiles{
-        public PopulateProfiles(){}
+    public static class PopulateProfiles {
+        public PopulateProfiles() {
+        }
     }
 
     /**
@@ -62,6 +69,7 @@ public class ProfileEvents {
      */
     public static class DeleteProfile {
         public String profileName;
+
         public DeleteProfile(String profileNameToDelete) {
             this.profileName = profileNameToDelete;
         }
@@ -70,5 +78,6 @@ public class ProfileEvents {
     /**
      * Requests saving the profile file
      */
-    public static class SaveProfile { }
+    public static class SaveProfile {
+    }
 }

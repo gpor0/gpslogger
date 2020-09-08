@@ -285,7 +285,7 @@ public class Strings {
             return getFormattedCustomFileName(currentFileName, GregorianCalendar.getInstance(), ph);
         } else {
             if (!Strings.isNullOrEmpty(currentFileName) && ph.shouldPrefixSerialToFileName() && !currentFileName.contains(String.valueOf(getBuildSerial()))) {
-                currentFileName = String.valueOf(getBuildSerial()) + "_" + currentFileName;
+                currentFileName = getBuildSerial() + "_" + currentFileName;
             }
         }
         return currentFileName;
@@ -294,8 +294,8 @@ public class Strings {
     public static String getFormattedCustomFileName(String baseName, Calendar calendar, PreferenceHelper ph){
 
         String finalFileName = baseName;
-        finalFileName = finalFileName.replaceAll("(?i)%ser", String.valueOf(getBuildSerial()));
-        finalFileName = finalFileName.replaceAll("(?i)%ver", String.valueOf(BuildConfig.VERSION_NAME));
+        finalFileName = finalFileName.replaceAll("(?i)%ser", getBuildSerial());
+        finalFileName = finalFileName.replaceAll("(?i)%ver", BuildConfig.VERSION_NAME);
         finalFileName = finalFileName.replaceAll("(?i)%hour", String.format("%02d", calendar.get(Calendar.HOUR_OF_DAY)));
         finalFileName = finalFileName.replaceAll("(?i)%min", String.format("%02d", calendar.get(Calendar.MINUTE)));
         finalFileName = finalFileName.replaceAll("(?i)%year",  String.valueOf(calendar.get(Calendar.YEAR)));
@@ -303,7 +303,7 @@ public class Strings {
         finalFileName = finalFileName.replaceAll("(?i)%month", String.format("%02d", calendar.get(Calendar.MONTH) +1));
         finalFileName = finalFileName.replaceAll("(?i)%dayname", new SimpleDateFormat("EE", Locale.ENGLISH).format(calendar.getTime()).toLowerCase());
         finalFileName = finalFileName.replaceAll("(?i)%day", String.format("%02d", calendar.get(Calendar.DAY_OF_MONTH) ));
-        finalFileName = finalFileName.replaceAll("(?i)%profile", String.valueOf(ph.getCurrentProfileName()));
+        finalFileName = finalFileName.replaceAll("(?i)%profile", ph.getCurrentProfileName());
         return finalFileName;
     }
 

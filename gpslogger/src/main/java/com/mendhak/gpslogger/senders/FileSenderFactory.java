@@ -94,12 +94,11 @@ public class FileSenderFactory {
             }
         })));
 
-        List<File> zipFiles = new ArrayList<>();
-
         if (files.size() == 0) {
-            LOG.warn("No files found to send after filtering.");
+            LOG.info("No files found to send after filtering.");
             return;
         }
+        List<File> zipFiles = new ArrayList<>();
 
         List<FileSender> senders = getFileAutosenders();
 

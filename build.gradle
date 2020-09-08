@@ -9,11 +9,11 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.4.2'
+        classpath 'com.android.tools.build:gradle:4.0.1'
     }
 }
 
 project.ext.APP_ID = "com.mendhak.gpslogger"
-project.ext.APP_VERSION_CODE = 105
-project.ext.APP_VERSION_NAME ="105-remerge"
+project.ext.APP_VERSION_CODE = 106
+project.ext.APP_VERSION_NAME ="106.1-gpor0"
 

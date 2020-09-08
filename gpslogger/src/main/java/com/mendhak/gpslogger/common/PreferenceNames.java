@@ -111,6 +111,8 @@ public  class PreferenceNames {
     public static final String ALTITUDE_SHOULD_ADJUST = "altitude_subtractgeoidheight";
     public static final String AUTOSEND_WIFI_ONLY = "autosend_wifionly";
     public static final String CURRENT_PROFILE_NAME = "current_profile_name";
+    public static final String PROFILE_URL = "profile_url";
+    public static final String PROFILE_URL_INTERVAL = "profile_url_interval";
     public static final String SELECTED_NAVITEM = "selected_navitem";
 
     public static final String LAST_VERSION_SEEN_BY_USER = "last_version_seen";

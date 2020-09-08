@@ -21,7 +21,7 @@ package com.mendhak.gpslogger.common.network;
 
 import android.content.Context;
 import android.os.Handler;
-import android.support.annotation.NonNull;
+import androidx.annotation.NonNull;
 import android.text.Html;
 import com.afollestad.materialdialogs.DialogAction;
 import com.afollestad.materialdialogs.MaterialDialog;
@@ -62,7 +62,7 @@ public class CertificateValidationWorkflow implements Runnable {
     public void run() {
         try {
 
-            LOG.debug("Beginning certificate validation - will connect directly to {} port {}", host, String.valueOf(port));
+            LOG.debug("Beginning certificate validation - will connect directly to {} port {}", host, port);
 
             try {
                 LOG.debug("Trying handshake first in case the socket is SSL/TLS only");

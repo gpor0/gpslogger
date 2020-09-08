@@ -50,6 +50,14 @@
         android:key="debugtofile"
         android:defaultValue="false"/>
 
+    <com.afollestad.materialdialogs.prefs.MaterialEditTextPreference
+        android:key="profile_url"
+        android:title="@string/profile_url"/>
+
+    <com.afollestad.materialdialogs.prefs.MaterialEditTextPreference
+        android:key="profile_url_interval"
+        android:title="@string/profile_url_interval"/>
+
     <Preference
         android:title="@string/debuglog_attach_to_email"
         android:summary="@string/debuglog_attach_to_email_summary"

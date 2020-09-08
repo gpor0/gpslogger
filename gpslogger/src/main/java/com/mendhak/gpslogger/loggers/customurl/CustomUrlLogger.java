@@ -20,57 +20,78 @@
 package com.mendhak.gpslogger.loggers.customurl;
 
 import android.location.Location;
+import android.util.Pair;
 
-import com.birbit.android.jobqueue.JobManager;
 import com.mendhak.gpslogger.common.AppSettings;
 import com.mendhak.gpslogger.common.PreferenceHelper;
 import com.mendhak.gpslogger.common.SerializableLocation;
 import com.mendhak.gpslogger.common.Session;
 import com.mendhak.gpslogger.common.Strings;
 import com.mendhak.gpslogger.common.Systems;
-import com.mendhak.gpslogger.common.events.UploadEvents;
-import com.mendhak.gpslogger.loggers.FileLogger;
+import com.mendhak.gpslogger.common.network.Networks;
+import com.mendhak.gpslogger.common.slf4j.Logs;
 
+import org.slf4j.Logger;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.security.KeyStore;
+import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
+import java.util.Map;
 
-public class CustomUrlLogger implements FileLogger {
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 
-    private final String name = "URL";
-    private final String customLoggingUrl;
-    private final int batteryLevel;
-    private final String httpMethod;
-    private final String httpBody;
-    private final String httpHeaders;
-    private final String basicAuthUsername;
-    private final String basicAuthPassword;
+import io.reactivex.Observer;
+import io.reactivex.disposables.Disposable;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
-    public CustomUrlLogger(String customLoggingUrl, int batteryLevel, String httpMethod, String httpBody, String httpHeaders) {
-        this(customLoggingUrl,batteryLevel, httpMethod, httpBody, httpHeaders, "","");
+public class CustomUrlLogger implements Observer<Pair<Location, Integer>> {
 
-    }
+    protected static PreferenceHelper preferenceHelper;
 
-    public CustomUrlLogger(String customLoggingUrl, int batteryLevel, String httpMethod, String httpBody, String httpHeaders, String basicAuthUsername, String basicAuthPassword) {
-        this.customLoggingUrl = customLoggingUrl;
-        this.batteryLevel = batteryLevel;
-        this.httpMethod = httpMethod;
-        this.httpBody = httpBody;
-        this.httpHeaders = httpHeaders;
-        this.basicAuthUsername = basicAuthUsername;
-        this.basicAuthPassword = basicAuthPassword;
-    }
+    private static final Logger LOG = Logs.of(CustomUrlLogger.class);
 
-    @Override
-    public void write(Location loc) throws Exception {
-        if (!Session.getInstance().hasDescription()) {
-            annotate("", loc);
+    private X509TrustManager trustManager;
+
+    public CustomUrlLogger() {
+
+        if (preferenceHelper == null) {
+            preferenceHelper = PreferenceHelper.getInstance();
+        }
+
+        try {
+            TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            trustManagerFactory.init((KeyStore) null);
+            TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
+            if (trustManagers.length != 1 || !(trustManagers[0] instanceof X509TrustManager)) {
+                throw new IllegalStateException("Unexpected default trust managers:" + Arrays.toString(trustManagers));
+            }
+            trustManager = (X509TrustManager) trustManagers[0];
+        } catch (Exception e) {
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
-    @Override
-    public void annotate(String description, Location loc) throws Exception {
+
+    public void annotate(Location loc, Integer batteryLevel) {
+
+        final String customLoggingUrl = preferenceHelper.getCustomLoggingUrl();
+        final String httpMethod = preferenceHelper.getCustomLoggingHTTPMethod();
+        final String httpBody = preferenceHelper.getCustomLoggingHTTPBody();
+        final String httpHeaders = preferenceHelper.getCustomLoggingHTTPHeaders();
+        final String basicAuthUsername = preferenceHelper.getCustomLoggingBasicAuthUsername();
+        final String basicAuthPassword = preferenceHelper.getCustomLoggingBasicAuthPassword();
+
+        LOG.info("HTTP " + httpMethod + " - " + customLoggingUrl);
+
+        String description = "";
 
         String finalUrl = getFormattedTextblock(customLoggingUrl, loc, description, Systems.getAndroidId(), batteryLevel, Strings.getBuildSerial(),
                 Session.getInstance().getStartTimeStamp(), Session.getInstance().getCurrentFormattedFileName(), PreferenceHelper.getInstance().getCurrentProfileName(), Session.getInstance().getTotalTravelled());
@@ -79,49 +100,100 @@ public class CustomUrlLogger implements FileLogger {
         String finalHeaders = getFormattedTextblock(httpHeaders, loc, description, Systems.getAndroidId(), batteryLevel, Strings.getBuildSerial(),
                 Session.getInstance().getStartTimeStamp(), Session.getInstance().getCurrentFormattedFileName(), PreferenceHelper.getInstance().getCurrentProfileName(), Session.getInstance().getTotalTravelled());
 
+        CustomUrlRequest urlRequest = new CustomUrlRequest(finalUrl, httpMethod, finalBody, finalHeaders, basicAuthUsername, basicAuthPassword);
 
-        JobManager jobManager = AppSettings.getJobManager();
-        jobManager.addJobInBackground(new CustomUrlJob(new CustomUrlRequest(finalUrl,httpMethod, finalBody, finalHeaders, basicAuthUsername, basicAuthPassword), new UploadEvents.CustomUrl()));
+        OkHttpClient.Builder okBuilder = new OkHttpClient.Builder();
+        okBuilder.sslSocketFactory(Networks.getSocketFactory(AppSettings.getInstance()), trustManager);
+        Request.Builder requestBuilder = new Request.Builder().url(urlRequest.getLogURL());
+
+        for (Map.Entry<String, String> header : urlRequest.getHttpHeaders().entrySet()) {
+            requestBuilder.addHeader(header.getKey(), header.getValue());
+        }
+
+        if (!urlRequest.getHttpMethod().equalsIgnoreCase("GET")) {
+            RequestBody body = RequestBody.create(null, urlRequest.getHttpBody());
+            requestBuilder = requestBuilder.method(urlRequest.getHttpMethod(), body);
+        }
+
+        Response response = null;
+        try {
+            Request request = requestBuilder.build();
+            response = okBuilder.build().newCall(request).execute();
+
+            if (response.isSuccessful()) {
+                LOG.debug("HTTP request complete with successful response code " + response);
+            } else {
+                throw new RuntimeException("HTTP request failed with unexpected response code " + response);
+            }
+
+        } catch (IOException e) {
+            throw new RuntimeException(e.getMessage(), e);
+        } finally {
+            if (response != null) {
+                response.body().close();
+            }
+        }
+
     }
 
 
-    public String getFormattedTextblock(String customLoggingUrl, Location loc, String description, String androidId,
-                                        float batteryLevel, String buildSerial, long sessionStartTimeStamp, String fileName, String profileName, double distance)
-            throws Exception {
+    public static String getFormattedTextblock(String customLoggingUrl, Location loc, String description, String androidId,
+                                               float batteryLevel, String buildSerial, long sessionStartTimeStamp, String fileName, String profileName, double distance) {
 
         String logUrl = customLoggingUrl;
         SerializableLocation sLoc = new SerializableLocation(loc);
-        logUrl = logUrl.replaceAll("(?i)%lat", String.valueOf(sLoc.getLatitude()));
-        logUrl = logUrl.replaceAll("(?i)%lon", String.valueOf(sLoc.getLongitude()));
-        logUrl = logUrl.replaceAll("(?i)%sat", String.valueOf(sLoc.getSatelliteCount()));
-        logUrl = logUrl.replaceAll("(?i)%desc", String.valueOf(URLEncoder.encode(Strings.htmlDecode(description), "UTF-8")));
-        logUrl = logUrl.replaceAll("(?i)%alt", String.valueOf(sLoc.getAltitude()));
-        logUrl = logUrl.replaceAll("(?i)%acc", String.valueOf(sLoc.getAccuracy()));
-        logUrl = logUrl.replaceAll("(?i)%dir", String.valueOf(sLoc.getBearing()));
-        logUrl = logUrl.replaceAll("(?i)%prov", String.valueOf(sLoc.getProvider()));
-        logUrl = logUrl.replaceAll("(?i)%spd", String.valueOf(sLoc.getSpeed()));
-        logUrl = logUrl.replaceAll("(?i)%timestamp", String.valueOf(sLoc.getTime()/1000));
-        logUrl = logUrl.replaceAll("(?i)%time", String.valueOf(Strings.getIsoDateTime(new Date(sLoc.getTime()))));
-        logUrl = logUrl.replaceAll("(?i)%date", String.valueOf(Strings.getIsoCalendarDate(new Date(sLoc.getTime()))));
-        logUrl = logUrl.replaceAll("(?i)%starttimestamp", String.valueOf(sessionStartTimeStamp/1000));
-        logUrl = logUrl.replaceAll("(?i)%batt", String.valueOf(batteryLevel));
-        logUrl = logUrl.replaceAll("(?i)%aid", String.valueOf(androidId));
-        logUrl = logUrl.replaceAll("(?i)%ser", String.valueOf(buildSerial));
-        logUrl = logUrl.replaceAll("(?i)%act", String.valueOf(sLoc.getDetectedActivity()));
-        logUrl = logUrl.replaceAll("(?i)%filename", fileName);
-        logUrl = logUrl.replaceAll("(?i)%profile",URLEncoder.encode(profileName, "UTF-8"));
-        logUrl = logUrl.replaceAll("(?i)%hdop", sLoc.getHDOP());
-        logUrl = logUrl.replaceAll("(?i)%vdop", sLoc.getVDOP());
-        logUrl = logUrl.replaceAll("(?i)%pdop", sLoc.getPDOP());
-        logUrl = logUrl.replaceAll("(?i)%dist", String.valueOf((int)distance));
-
+        try {
+            logUrl = logUrl.replaceAll("(?i)%lat", String.valueOf(sLoc.getLatitude()));
+            logUrl = logUrl.replaceAll("(?i)%lon", String.valueOf(sLoc.getLongitude()));
+            logUrl = logUrl.replaceAll("(?i)%sat", String.valueOf(sLoc.getSatelliteCount()));
+            logUrl = logUrl.replaceAll("(?i)%desc", Strings.htmlDecode(description));
+            logUrl = logUrl.replaceAll("(?i)%alt", String.valueOf(sLoc.getAltitude()));
+            logUrl = logUrl.replaceAll("(?i)%acc", String.valueOf(sLoc.getAccuracy()));
+            logUrl = logUrl.replaceAll("(?i)%dir", String.valueOf(sLoc.getBearing()));
+            logUrl = logUrl.replaceAll("(?i)%prov", sLoc.getProvider());
+            logUrl = logUrl.replaceAll("(?i)%spd", String.valueOf(sLoc.getSpeed()));
+            logUrl = logUrl.replaceAll("(?i)%timestamp", String.valueOf(sLoc.getTime() / 1000));
+            logUrl = logUrl.replaceAll("(?i)%time", Strings.getIsoDateTime(new Date(sLoc.getTime())));
+            logUrl = logUrl.replaceAll("(?i)%date", Strings.getIsoCalendarDate(new Date(sLoc.getTime())));
+            logUrl = logUrl.replaceAll("(?i)%starttimestamp", String.valueOf(sessionStartTimeStamp / 1000));
+            logUrl = logUrl.replaceAll("(?i)%batt", String.valueOf(batteryLevel));
+            logUrl = logUrl.replaceAll("(?i)%aid", androidId);
+            logUrl = logUrl.replaceAll("(?i)%ser", buildSerial);
+            logUrl = logUrl.replaceAll("(?i)%act", sLoc.getDetectedActivity());
+            logUrl = logUrl.replaceAll("(?i)%filename", fileName);
+            logUrl = logUrl.replaceAll("(?i)%profile", URLEncoder.encode(profileName, "UTF-8"));
+            logUrl = logUrl.replaceAll("(?i)%hdop", sLoc.getHDOP());
+            logUrl = logUrl.replaceAll("(?i)%vdop", sLoc.getVDOP());
+            logUrl = logUrl.replaceAll("(?i)%pdop", sLoc.getPDOP());
+            logUrl = logUrl.replaceAll("(?i)%dist", String.valueOf((int) distance));
+        } catch (UnsupportedEncodingException e) {
+            LOG.warn(e.getMessage(), e);
+        }
         return logUrl;
     }
 
+    @Override
+    public void onSubscribe(Disposable d) {
+        LOG.info("CustomUrlLogger.onSubscribe");
+    }
 
     @Override
-    public String getName() {
-        return name;
+    public void onNext(Pair<Location, Integer> locationIntegerPair) {
+        try {
+            annotate(locationIntegerPair.first, locationIntegerPair.second);
+        } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void onError(Throwable e) {
+        LOG.error("CustomUrlLogger.onError: " + e.getMessage(), e);
+    }
+
+    @Override
+    public void onComplete() {
+        LOG.info("CustomUrlLogger.onComplete");
     }
 }
 

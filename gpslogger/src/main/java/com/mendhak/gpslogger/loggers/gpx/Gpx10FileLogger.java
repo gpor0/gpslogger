@@ -19,25 +19,34 @@
 
 package com.mendhak.gpslogger.loggers.gpx;
 
+import android.content.Context;
 import android.location.Location;
+import android.util.Pair;
+
 import com.mendhak.gpslogger.BuildConfig;
 import com.mendhak.gpslogger.common.BundleConstants;
 import com.mendhak.gpslogger.common.Maths;
 import com.mendhak.gpslogger.common.RejectionHandler;
 import com.mendhak.gpslogger.common.Strings;
 import com.mendhak.gpslogger.common.slf4j.Logs;
-import com.mendhak.gpslogger.loggers.FileLogger;
 import com.mendhak.gpslogger.loggers.Files;
-import org.slf4j.Logger;
 
-import java.io.*;
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
 import java.util.Date;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import io.reactivex.Observer;
+import io.reactivex.disposables.Disposable;
 
-public class Gpx10FileLogger implements FileLogger {
+
+public class Gpx10FileLogger implements Observer<Pair<Location, Integer>> {
     protected final static Object lock = new Object();
 
     private final static ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS,
@@ -51,7 +60,7 @@ public class Gpx10FileLogger implements FileLogger {
         this.addNewTrackSegment = addNewTrackSegment;
     }
 
-    public void write(Location loc) throws Exception {
+    public void write(Context context, Location loc) throws Exception {
         long time = loc.getTime();
         if (time <= 0) {
             time = System.currentTimeMillis();
@@ -62,12 +71,32 @@ public class Gpx10FileLogger implements FileLogger {
         EXECUTOR.execute(writeHandler);
     }
 
-    public Runnable getWriteHandler(String dateTimeString, File gpxFile, Location loc, boolean addNewTrackSegment)
-    {
+    public Runnable getWriteHandler(String dateTimeString, File gpxFile, Location loc, boolean addNewTrackSegment) {
         return new Gpx10WriteHandler(dateTimeString, gpxFile, loc, addNewTrackSegment);
     }
 
-    public void annotate(String description, Location loc) throws Exception {
+
+    @Override
+    public void onSubscribe(Disposable d) {
+
+    }
+
+    @Override
+    public void onNext(Pair<Location, Integer> locationIntegerPair) {
+        annotate("", locationIntegerPair.first);
+    }
+
+    @Override
+    public void onError(Throwable e) {
+
+    }
+
+    @Override
+    public void onComplete() {
+
+    }
+
+    public void annotate(String description, Location loc) {
 
         description = Strings.cleanDescriptionForXml(description);
 
@@ -81,22 +110,16 @@ public class Gpx10FileLogger implements FileLogger {
         EXECUTOR.execute(annotateHandler);
     }
 
-    public Runnable getAnnotateHandler(String description, File gpxFile, Location loc, String dateTimeString){
+    public Runnable getAnnotateHandler(String description, File gpxFile, Location loc, String dateTimeString) {
         //Use the writer to calculate initial XML length, use that as offset for annotations
-        Gpx10WriteHandler writer = (Gpx10WriteHandler)getWriteHandler(dateTimeString, gpxFile, loc, true);
+        Gpx10WriteHandler writer = (Gpx10WriteHandler) getWriteHandler(dateTimeString, gpxFile, loc, true);
         return new Gpx10AnnotateHandler(description, gpxFile, loc, dateTimeString, writer.getBeginningXml(dateTimeString).length());
     }
-
-    @Override
-    public String getName() {
-        return name;
-    }
-
 
 }
 
 class Gpx10AnnotateHandler implements Runnable {
-    private static final Logger LOG = Logs.of(Gpx10AnnotateHandler.class);
+    private static final org.slf4j.Logger LOG = Logs.of(Gpx10AnnotateHandler.class);
     String description;
     File gpxFile;
     Location loc;
@@ -115,7 +138,7 @@ class Gpx10AnnotateHandler implements Runnable {
     public void run() {
 
         synchronized (Gpx10FileLogger.lock) {
-            if(!Files.reallyExists(gpxFile)){
+            if (!Files.reallyExists(gpxFile)) {
                 return;
             }
 
@@ -185,7 +208,7 @@ class Gpx10AnnotateHandler implements Runnable {
 
 
 class Gpx10WriteHandler implements Runnable {
-    private static final Logger LOG = Logs.of(Gpx10WriteHandler.class);
+    private static final org.slf4j.Logger LOG = Logs.of(Gpx10WriteHandler.class);
     String dateTimeString;
     Location loc;
     private File gpxFile = null;
@@ -238,7 +261,7 @@ class Gpx10WriteHandler implements Runnable {
 
     }
 
-    String getBeginningXml(String dateTimeString){
+    String getBeginningXml(String dateTimeString) {
         StringBuilder initialXml = new StringBuilder();
         initialXml.append("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>");
         initialXml.append("<gpx version=\"1.0\" creator=\"GPSLogger " + BuildConfig.VERSION_CODE + " - http://gpslogger.mendhak.com/\" ");
@@ -250,11 +273,11 @@ class Gpx10WriteHandler implements Runnable {
         return initialXml.toString();
     }
 
-    String getEndXml(){
+    String getEndXml() {
         return "</trk></gpx>";
     }
 
-    String getEndXmlWithSegment(){
+    String getEndXmlWithSegment() {
         return "</trkseg></trk></gpx>";
     }
 
@@ -294,7 +317,7 @@ class Gpx10WriteHandler implements Runnable {
 
             int sat = Maths.getBundledSatelliteCount(loc);
 
-            if(sat > 0){
+            if (sat > 0) {
                 track.append("<sat>").append(String.valueOf(sat)).append("</sat>");
             }
 
@@ -334,8 +357,7 @@ class Gpx10WriteHandler implements Runnable {
         return track.toString();
     }
 
-    public void appendCourseAndSpeed(StringBuilder track, Location loc)
-    {
+    public void appendCourseAndSpeed(StringBuilder track, Location loc) {
         if (loc.hasBearing()) {
             track.append("<course>").append(String.valueOf(loc.getBearing())).append("</course>");
         }
