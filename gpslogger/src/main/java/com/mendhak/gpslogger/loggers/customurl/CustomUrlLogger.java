@@ -45,14 +45,13 @@ import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
 
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.observers.DisposableObserver;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 
-public class CustomUrlLogger implements Observer<Pair<Location, Integer>> {
+public class CustomUrlLogger extends DisposableObserver<Pair<Location, Integer>> {
 
     protected static PreferenceHelper preferenceHelper;
 
@@ -170,11 +169,6 @@ public class CustomUrlLogger implements Observer<Pair<Location, Integer>> {
             LOG.warn(e.getMessage(), e);
         }
         return logUrl;
-    }
-
-    @Override
-    public void onSubscribe(Disposable d) {
-        LOG.info("CustomUrlLogger.onSubscribe");
     }
 
     @Override

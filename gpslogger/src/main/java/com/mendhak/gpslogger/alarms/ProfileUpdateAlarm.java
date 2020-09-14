@@ -51,7 +51,7 @@ public class ProfileUpdateAlarm extends BroadcastReceiver {
         AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         Intent i = new Intent(context, ProfileUpdateAlarm.class);
         PendingIntent pi = PendingIntent.getBroadcast(context, 0, i, 0);
-        am.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), interval() / 2, pi); // Millisec * Second * Minute
+        am.setInexactRepeating(AlarmManager.RTC_WAKEUP, System.currentTimeMillis(), interval(), pi); // Millisec * Second * Minute
     }
 
     public void cancelAlarm(Context context) {

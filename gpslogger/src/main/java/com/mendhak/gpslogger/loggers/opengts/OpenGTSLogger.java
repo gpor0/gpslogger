@@ -26,15 +26,14 @@ import com.mendhak.gpslogger.common.PreferenceHelper;
 import com.mendhak.gpslogger.common.SerializableLocation;
 import com.mendhak.gpslogger.senders.opengts.OpenGTSManager;
 
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.observers.DisposableObserver;
 
 /**
  * Send locations directly to an OpenGTS server <br/>
  *
  * @author Francisco Reynoso
  */
-public class OpenGTSLogger implements Observer<Pair<Location, Integer>> {
+public class OpenGTSLogger extends DisposableObserver<Pair<Location, Integer>> {
 
     protected final String name = "OpenGTS";
     private static PreferenceHelper preferenceHelper = PreferenceHelper.getInstance();
@@ -45,11 +44,6 @@ public class OpenGTSLogger implements Observer<Pair<Location, Integer>> {
     public void write(Integer batteryLevel, Location loc) {
         OpenGTSManager manager = new OpenGTSManager(preferenceHelper, batteryLevel);
         manager.sendLocations(new SerializableLocation[]{new SerializableLocation(loc)});
-    }
-
-    @Override
-    public void onSubscribe(Disposable d) {
-
     }
 
     @Override

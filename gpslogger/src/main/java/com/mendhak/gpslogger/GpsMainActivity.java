@@ -1411,8 +1411,8 @@ public class GpsMainActivity extends AppCompatActivity
     public void onEventBackgroundThread(ProfileEvents.DownloadProfile downloadProfileEvent) {
 
         Integer profileSyncInterval = ProfileUpdateAlarm.interval();
-        if (lastProfileDownloadTs + 3600000 * profileSyncInterval > System.currentTimeMillis()) {
-            LOG.debug("witihin last sync");
+        if (!downloadProfileEvent.force && lastProfileDownloadTs + profileSyncInterval > System.currentTimeMillis()) {
+            LOG.debug("within last sync");
             return;
         }
 

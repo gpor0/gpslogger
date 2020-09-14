@@ -35,23 +35,16 @@ import java.io.IOException;
 import java.util.Date;
 import java.util.Locale;
 
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.observers.DisposableObserver;
 
 
-public class CSVFileLogger implements Observer<Pair<Location, Integer>> {
+public class CSVFileLogger extends DisposableObserver<Pair<Location, Integer>> {
 
     private File file;
     protected final String name = "TXT";
 
     public CSVFileLogger(File file) {
         this.file = file;
-    }
-
-
-    @Override
-    public void onSubscribe(Disposable d) {
-
     }
 
     @Override

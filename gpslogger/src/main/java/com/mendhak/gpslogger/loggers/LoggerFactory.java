@@ -43,6 +43,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import io.reactivex.disposables.CompositeDisposable;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.PublishSubject;
 
@@ -53,72 +54,75 @@ public class LoggerFactory {
     private static Session session = Session.getInstance();
 
     private static PublishSubject<Pair<Location, Integer>> source;
+    private static CompositeDisposable compositeDisposable = new CompositeDisposable();
     private static Set<String> subscribers = new HashSet<>();
 
 
-    public static void reinitLoggers() {
+    public static synchronized void reinitLoggers() {
 
-        if (source == null) {
-            if (Strings.isNullOrEmpty(preferenceHelper.getGpsLoggerFolder())) {
-                return;
-            }
+        LOG.info("reinitLoggers source=" + source);
 
-            File gpxFolder = new File(preferenceHelper.getGpsLoggerFolder());
-            if (!gpxFolder.exists()) {
-                gpxFolder.mkdirs();
-            }
-
-            source = PublishSubject.create();
-
-            if (preferenceHelper.shouldLogToCustomUrl()) {
-
-                CustomUrlLogger customUrlLogger = new CustomUrlLogger();
-                //we would take last from backpressure in order to not spam upstream
-                source.observeOn(Schedulers.io()).sample(10, TimeUnit.SECONDS).subscribe(customUrlLogger);
-                subscribers.add(customUrlLogger.getClass().getSimpleName());
-            }
-
-            if (preferenceHelper.shouldLogToGpx()) {
-                File gpxFile = new File(gpxFolder.getPath(), Strings.getFormattedFileName() + ".gpx");
-                if (preferenceHelper.shouldLogAsGpx11()) {
-                    Gpx11FileLogger gpx11FileLogger = new Gpx11FileLogger(gpxFile, session.shouldAddNewTrackSegment());
-                    source.observeOn(Schedulers.io()).subscribe(gpx11FileLogger);
-                    subscribers.add(gpx11FileLogger.getClass().getSimpleName());
-                } else {
-                    Gpx10FileLogger gpx10FileLogger = new Gpx10FileLogger(gpxFile, session.shouldAddNewTrackSegment());
-                    source.observeOn(Schedulers.io()).subscribe(gpx10FileLogger);
-                    subscribers.add(gpx10FileLogger.getClass().getSimpleName());
-                }
-            }
-
-            if (preferenceHelper.shouldLogToKml()) {
-                File kmlFile = new File(gpxFolder.getPath(), Strings.getFormattedFileName() + ".kml");
-                Kml22FileLogger kml22FileLogger = new Kml22FileLogger(kmlFile, session.shouldAddNewTrackSegment());
-                source.observeOn(Schedulers.io()).subscribe(kml22FileLogger);
-                subscribers.add(kml22FileLogger.getClass().getSimpleName());
-            }
-
-            if (preferenceHelper.shouldLogToCSV()) {
-                File file = new File(gpxFolder.getPath(), Strings.getFormattedFileName() + ".csv");
-                CSVFileLogger csvFileLogger = new CSVFileLogger(file);
-                source.observeOn(Schedulers.io()).subscribe(csvFileLogger);
-                subscribers.add(csvFileLogger.getClass().getSimpleName());
-            }
-
-            if (preferenceHelper.shouldLogToOpenGTS()) {
-                OpenGTSLogger openGTSLogger = new OpenGTSLogger();
-                source.observeOn(Schedulers.io()).subscribe(openGTSLogger);
-                subscribers.add(openGTSLogger.getClass().getSimpleName());
-            }
-
-            if (preferenceHelper.shouldLogToGeoJSON()) {
-                File file = new File(gpxFolder.getPath(), Strings.getFormattedFileName() + ".geojson");
-                GeoJSONLogger geoJSONLogger = new GeoJSONLogger(file, session.shouldAddNewTrackSegment());
-                source.observeOn(Schedulers.io()).subscribe(geoJSONLogger);
-                subscribers.add(geoJSONLogger.getClass().getSimpleName());
-            }
-
+        if (Strings.isNullOrEmpty(preferenceHelper.getGpsLoggerFolder())) {
+            return;
         }
+
+        File gpxFolder = new File(preferenceHelper.getGpsLoggerFolder());
+        if (!gpxFolder.exists()) {
+            gpxFolder.mkdirs();
+        }
+
+        compositeDisposable.clear();
+        source = PublishSubject.create();
+        subscribers = new HashSet<>();
+
+        if (preferenceHelper.shouldLogToCustomUrl()) {
+
+            CustomUrlLogger customUrlLogger = new CustomUrlLogger();
+            //we would take last from backpressure in order to not spam upstream
+            compositeDisposable.add(source.observeOn(Schedulers.io()).sample(10, TimeUnit.SECONDS).subscribeWith(customUrlLogger));
+            subscribers.add(customUrlLogger.getClass().getSimpleName());
+        }
+
+        if (preferenceHelper.shouldLogToGpx()) {
+            File gpxFile = new File(gpxFolder.getPath(), Strings.getFormattedFileName() + ".gpx");
+            if (preferenceHelper.shouldLogAsGpx11()) {
+                Gpx11FileLogger gpx11FileLogger = new Gpx11FileLogger(gpxFile, session.shouldAddNewTrackSegment());
+                compositeDisposable.add(source.observeOn(Schedulers.io()).subscribeWith(gpx11FileLogger));
+                subscribers.add(gpx11FileLogger.getClass().getSimpleName());
+            } else {
+                Gpx10FileLogger gpx10FileLogger = new Gpx10FileLogger(gpxFile, session.shouldAddNewTrackSegment());
+                compositeDisposable.add(source.observeOn(Schedulers.io()).subscribeWith(gpx10FileLogger));
+                subscribers.add(gpx10FileLogger.getClass().getSimpleName());
+            }
+        }
+
+        if (preferenceHelper.shouldLogToKml()) {
+            File kmlFile = new File(gpxFolder.getPath(), Strings.getFormattedFileName() + ".kml");
+            Kml22FileLogger kml22FileLogger = new Kml22FileLogger(kmlFile, session.shouldAddNewTrackSegment());
+            compositeDisposable.add(source.observeOn(Schedulers.io()).subscribeWith(kml22FileLogger));
+            subscribers.add(kml22FileLogger.getClass().getSimpleName());
+        }
+
+        if (preferenceHelper.shouldLogToCSV()) {
+            File file = new File(gpxFolder.getPath(), Strings.getFormattedFileName() + ".csv");
+            CSVFileLogger csvFileLogger = new CSVFileLogger(file);
+            compositeDisposable.add(source.observeOn(Schedulers.io()).subscribeWith(csvFileLogger));
+            subscribers.add(csvFileLogger.getClass().getSimpleName());
+        }
+
+        if (preferenceHelper.shouldLogToOpenGTS()) {
+            OpenGTSLogger openGTSLogger = new OpenGTSLogger();
+            compositeDisposable.add(source.observeOn(Schedulers.io()).subscribeWith(openGTSLogger));
+            subscribers.add(openGTSLogger.getClass().getSimpleName());
+        }
+
+        if (preferenceHelper.shouldLogToGeoJSON()) {
+            File file = new File(gpxFolder.getPath(), Strings.getFormattedFileName() + ".geojson");
+            GeoJSONLogger geoJSONLogger = new GeoJSONLogger(file, session.shouldAddNewTrackSegment());
+            compositeDisposable.add(source.observeOn(Schedulers.io()).subscribeWith(geoJSONLogger));
+            subscribers.add(geoJSONLogger.getClass().getSimpleName());
+        }
+
     }
 
     public static Set<String> getLoggers() {
@@ -132,9 +136,18 @@ public class LoggerFactory {
     public static void emit(Context context, Location loc) {
         LOG.info("emit new location");
         Integer batteryLevel = Systems.getBatteryLevel(context);
-        if(source == null) {
+        if (source == null) {
             reinitLoggers();
         }
         source.onNext(new Pair<>(loc, batteryLevel));
+    }
+
+    public static void onDestroy() {
+
+        if (source != null) {
+            source = null;
+        }
+
+        compositeDisposable.clear();
     }
 }

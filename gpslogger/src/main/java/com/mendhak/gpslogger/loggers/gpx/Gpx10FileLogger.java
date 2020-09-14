@@ -42,11 +42,10 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.observers.DisposableObserver;
 
 
-public class Gpx10FileLogger implements Observer<Pair<Location, Integer>> {
+public class Gpx10FileLogger extends DisposableObserver<Pair<Location, Integer>> {
     protected final static Object lock = new Object();
 
     private final static ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS,
@@ -73,12 +72,6 @@ public class Gpx10FileLogger implements Observer<Pair<Location, Integer>> {
 
     public Runnable getWriteHandler(String dateTimeString, File gpxFile, Location loc, boolean addNewTrackSegment) {
         return new Gpx10WriteHandler(dateTimeString, gpxFile, loc, addNewTrackSegment);
-    }
-
-
-    @Override
-    public void onSubscribe(Disposable d) {
-
     }
 
     @Override

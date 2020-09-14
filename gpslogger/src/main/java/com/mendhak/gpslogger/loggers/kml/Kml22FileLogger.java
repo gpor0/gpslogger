@@ -38,10 +38,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
-import io.reactivex.Observer;
-import io.reactivex.disposables.Disposable;
+import io.reactivex.observers.DisposableObserver;
 
-public class Kml22FileLogger implements Observer<Pair<Location, Integer>> {
+public class Kml22FileLogger extends DisposableObserver<Pair<Location, Integer>> {
     protected final static Object lock = new Object();
     private final static ThreadPoolExecutor EXECUTOR = new ThreadPoolExecutor(1, 1, 60, TimeUnit.SECONDS,
             new LinkedBlockingQueue<Runnable>(10), new RejectionHandler());
@@ -59,11 +58,6 @@ public class Kml22FileLogger implements Observer<Pair<Location, Integer>> {
     public void write(Context context, Location loc) throws Exception {
         Kml22WriteHandler writeHandler = new Kml22WriteHandler(loc, kmlFile, addNewTrackSegment);
         EXECUTOR.execute(writeHandler);
-    }
-
-    @Override
-    public void onSubscribe(Disposable d) {
-
     }
 
     @Override
